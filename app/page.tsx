@@ -171,6 +171,8 @@ export default function Page() {
     flexDirection: isMobile ? "column" : "row",
     height: "100vh",
     overflow: "hidden",
+    background: "#ffffff", // ← 白背景強制
+    color: "#000000", // ← 黒文字強制
   };
 
   const leftMenuStyle: React.CSSProperties = {
@@ -199,10 +201,6 @@ export default function Page() {
     background: watched ? "#dcedc8" : "#fff",
   });
 
-  // -----------------------------------
-  // スマホ表示では 1カラム + 折りたたみ
-  // -----------------------------------
-
   return (
     <div style={containerStyle}>
 
@@ -226,7 +224,14 @@ export default function Page() {
           {/* 折りたたみメニュー */}
           {showMobileMenu && (
             <div style={{ marginTop: "12px" }}>
-              <div style={leftMenuStyle}>
+              <div
+                style={{
+                  ...leftMenuStyle,
+                  maxHeight: "60vh", // ← 追加：スマホで縦スクロール可能に
+                  overflowY: "auto",
+                  WebkitOverflowScrolling: "touch",
+                }}
+              >
                 <h2>ドラマ一覧</h2>
 
                 {/* 追加フォーム */}
@@ -453,6 +458,7 @@ export default function Page() {
           <div style={{ color: "#666" }}>ドラマを選択してね</div>
         )}
       </div>
+
     </div>
   );
 }
