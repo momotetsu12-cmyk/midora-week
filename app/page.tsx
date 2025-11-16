@@ -1,6 +1,16 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
+import { auth } from "@/lib/firebase";
+import { onAuthStateChanged, signOut, User } from "firebase/auth";
+import { useRouter } from "next/navigation";
+
+// ----------- ここにホワイトリスト登録メールアドレスを書く -----------
+// ここに許可するユーザーのメールアドレスを列挙（小文字で）
+const allowedUsers = [
+  "alloweduser1@example.com",
+  "alloweduser2@example.com",
+];
 
 // 曜日順（並び替え用）
 const weekdayOrder = ["日", "月", "火", "水", "木", "金", "土"];
@@ -23,6 +33,14 @@ type Drama = {
 };
 
 export default function Page() {
+  const router = useRouter();
+
+  // 認証関連状態
+  const [user, setUser] = useState<User | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  // ドラマ関連状態（元のあなたのコード）
   const [dramas, setDramas] = useState<Drama[]>([]);
   const [selectedDramaId, setSelectedDramaId] = useState<string | null>(null);
 
@@ -46,22 +64,49 @@ export default function Page() {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
+  // --- Firebase認証状態監視 ---
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        // ホワイトリストチェック（メールは小文字に変換して比較）
+        const email = firebaseUser.email?.toLowerCase() || "";
+        if (!allowedUsers.includes(email)) {
+          setAuthError("あなたはアクセス権限がありません。ログアウトします。");
+          signOut(auth);
+          setUser(null);
+        } else {
+          setUser(firebaseUser);
+          setAuthError(null);
+        }
+      } else {
+        setUser(null);
+      }
+      setAuthChecked(true);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
   // --------------------------
   // ① localStorage から読み込み
   // --------------------------
   React.useEffect(() => {
+    if (!authChecked) return;
+    if (!user) return;
+
     const saved = localStorage.getItem("dramas");
     if (saved) {
       setDramas(JSON.parse(saved));
     }
-  }, []);
+  }, [authChecked, user]);
 
   // --------------------------
   // ② localStorage に保存
   // --------------------------
   React.useEffect(() => {
+    if (!user) return;
     localStorage.setItem("dramas", JSON.stringify(dramas));
-  }, [dramas]);
+  }, [dramas, user]);
 
   // ドラマ追加（12回分を自動生成）
   const addDrama = () => {
@@ -163,16 +208,39 @@ export default function Page() {
     );
   }, [dramas]);
 
+  // ログアウト処理
+  const handleLogout = async () => {
+    await signOut(auth);
+    router.refresh();
+  };
+
+  if (!authChecked) {
+    return <div>認証を確認中...</div>;
+  }
+
+  if (!user) {
+    router.push("/login");
+    return <div>ログインしてください...</div>;
+  }
+
+  if (authError) {
+    return (
+      <div style={{ padding: 20, color: "red" }}>
+        {authError}
+      </div>
+    );
+  }
+
   // --------------------------
-  // 見た目
+  // 見た目（元のコードのスタイルそのまま）
   // --------------------------
   const containerStyle: React.CSSProperties = {
     display: "flex",
     flexDirection: isMobile ? "column" : "row",
     height: "100vh",
     overflow: "hidden",
-    background: "#ffffff", // ← 白背景強制
-    color: "#000000", // ← 黒文字強制
+    background: "#ffffff",
+    color: "#000000",
   };
 
   const leftMenuStyle: React.CSSProperties = {
@@ -203,6 +271,22 @@ export default function Page() {
 
   return (
     <div style={containerStyle}>
+      {/* ログアウトボタン */}
+      <div style={{ position: "fixed", top: 12, right: 12 }}>
+        <button
+          onClick={handleLogout}
+          style={{
+            padding: "8px 12px",
+            background: "#e53935",
+            color: "white",
+            border: "none",
+            borderRadius: 6,
+            cursor: "pointer",
+          }}
+        >
+          ログアウト
+        </button>
+      </div>
 
       {/* ▼▼ スマホ用：一覧を開閉 ▼▼ */}
       {isMobile && (
@@ -227,7 +311,7 @@ export default function Page() {
               <div
                 style={{
                   ...leftMenuStyle,
-                  maxHeight: "60vh", // ← 追加：スマホで縦スクロール可能に
+                  maxHeight: "60vh",
                   overflowY: "auto",
                   WebkitOverflowScrolling: "touch",
                 }}
@@ -458,7 +542,6 @@ export default function Page() {
           <div style={{ color: "#666" }}>ドラマを選択してね</div>
         )}
       </div>
-
     </div>
   );
 }
