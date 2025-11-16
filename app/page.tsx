@@ -2,22 +2,23 @@
 
 import React, { useState, useMemo } from "react";
 
-// 曜日順の並び設定（0=日曜 → 6=土曜）
+// 曜日順（並び替え用）
 const weekdayOrder = ["日", "月", "火", "水", "木", "金", "土"];
 
-// ドラマ1件の型
+// episode型
 type Episode = {
   id: string;
-  episodeNumber: number; // 第n回
+  episodeNumber: number;
   date: string;
   watched: boolean;
 };
 
+// drama型
 type Drama = {
   id: string;
   title: string;
-  weekday: string; // 曜日
-  time: string; // 放送時間
+  weekday: string;
+  time: string;
   episodes: Episode[];
 };
 
@@ -30,7 +31,39 @@ export default function Page() {
   const [weekdayInput, setWeekdayInput] = useState("月");
   const [timeInput, setTimeInput] = useState("21:00");
 
-  // ドラマ追加 → 12回分のエピソード生成
+  // スマホUI用：一覧の開閉
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
+
+  // 画面幅判定
+  const [isMobile, setIsMobile] = React.useState(false);
+
+  React.useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 600);
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  // --------------------------
+  // ① localStorage から読み込み
+  // --------------------------
+  React.useEffect(() => {
+    const saved = localStorage.getItem("dramas");
+    if (saved) {
+      setDramas(JSON.parse(saved));
+    }
+  }, []);
+
+  // --------------------------
+  // ② localStorage に保存
+  // --------------------------
+  React.useEffect(() => {
+    localStorage.setItem("dramas", JSON.stringify(dramas));
+  }, [dramas]);
+
+  // ドラマ追加（12回分を自動生成）
   const addDrama = () => {
     if (!titleInput.trim()) return;
 
@@ -70,8 +103,13 @@ export default function Page() {
 
     setDramas((prev) => [...prev, newDrama]);
     setTitleInput("");
+
+    if (isMobile) {
+      setShowMobileMenu(false); // スマホは追加したら自動で閉じる
+    }
   };
 
+  // 選択中ドラマ
   const selectedDrama = useMemo(
     () => dramas.find((d) => d.id === selectedDramaId) || null,
     [selectedDramaId, dramas]
@@ -117,48 +155,41 @@ export default function Page() {
     if (selectedDramaId === id) setSelectedDramaId(null);
   };
 
+  // 並び替え
   const sortedDramas = useMemo(() => {
-    // 注意: sortは破壊的なのでコピーしてからsort
     return [...dramas].sort(
       (a, b) =>
         weekdayOrder.indexOf(a.weekday) - weekdayOrder.indexOf(b.weekday)
     );
   }, [dramas]);
 
-  // --- レスポンシブ用スタイル ---
-  // 画面幅600px以下で文字サイズを小さく、右側の幅調整
+  // --------------------------
+  // 見た目
+  // --------------------------
   const containerStyle: React.CSSProperties = {
     display: "flex",
-    flexDirection: "row",
+    flexDirection: isMobile ? "column" : "row",
     height: "100vh",
     overflow: "hidden",
-    fontFamily: "sans-serif",
-    backgroundColor: "#fff",
-    color: "#222",
   };
 
   const leftMenuStyle: React.CSSProperties = {
-    width: "240px",
-    borderRight: "1px solid #ccc",
+    width: isMobile ? "100%" : "240px",
     padding: "12px",
+    borderRight: isMobile ? "none" : "1px solid #ccc",
+    borderBottom: isMobile ? "1px solid #ccc" : "none",
     overflowY: "auto",
+    background: "#fafafa",
   };
 
-  const dramaItemStyle = (isSelected: boolean): React.CSSProperties => ({
+  const dramaItemStyle = (selected: boolean): React.CSSProperties => ({
     padding: "10px",
     marginBottom: "8px",
     borderRadius: "8px",
-    background: isSelected ? "#bbdefb" : "#f0f0f0",
+    background: selected ? "#bbdefb" : "#f0f0f0",
     cursor: "pointer",
     border: "1px solid #ddd",
-    userSelect: "none",
   });
-
-  const rightPanelStyle: React.CSSProperties = {
-    flex: 1,
-    padding: "16px",
-    overflowY: "auto",
-  };
 
   const episodeCardStyle = (watched: boolean): React.CSSProperties => ({
     padding: "14px",
@@ -168,193 +199,221 @@ export default function Page() {
     background: watched ? "#dcedc8" : "#fff",
   });
 
-  // メディアクエリ的にスタイル変更するために簡単にJSで判定
-  const [isMobile, setIsMobile] = React.useState(false);
-
-  React.useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth <= 600);
-    };
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
-  }, []);
+  // -----------------------------------
+  // スマホ表示では 1カラム + 折りたたみ
+  // -----------------------------------
 
   return (
-    <div
-      style={{
-        ...containerStyle,
-        flexDirection: isMobile ? "column" : "row",
-      }}
-    >
-      {/* 左メニュー */}
-      <div
-        style={{
-          ...leftMenuStyle,
-          width: isMobile ? "100%" : "240px",
-          borderRight: isMobile ? "none" : "1px solid #ccc",
-          borderBottom: isMobile ? "1px solid #ccc" : "none",
-          maxHeight: isMobile ? "auto" : "100vh",
-          overflowY: "auto",
-        }}
-      >
-        <h2
-          style={{
-            marginBottom: "12px",
-            fontSize: isMobile ? "20px" : "24px",
-          }}
-        >
-          ドラマ一覧
-        </h2>
+    <div style={containerStyle}>
 
-        {/* 追加フォーム */}
-        <div
-          style={{
-            marginBottom: "16px",
-            display: "flex",
-            flexDirection: "column",
-            gap: "8px",
-          }}
-        >
-          <input
-            value={titleInput}
-            onChange={(e) => setTitleInput(e.target.value)}
-            placeholder="ドラマ名を入力"
-            style={{
-              padding: "10px",
-              borderRadius: "6px",
-              border: "1px solid #ccc",
-              fontSize: isMobile ? "14px" : "16px",
-            }}
-          />
-          <select
-            value={weekdayInput}
-            onChange={(e) => setWeekdayInput(e.target.value)}
-            style={{
-              padding: "10px",
-              borderRadius: "6px",
-              border: "1px solid #ccc",
-              fontSize: isMobile ? "14px" : "16px",
-            }}
-          >
-            {weekdayOrder.map((w) => (
-              <option key={w}>{w}</option>
-            ))}
-          </select>
-          <input
-            value={timeInput}
-            onChange={(e) => setTimeInput(e.target.value)}
-            type="time"
-            style={{
-              padding: "10px",
-              borderRadius: "6px",
-              border: "1px solid #ccc",
-              fontSize: isMobile ? "14px" : "16px",
-            }}
-          />
+      {/* ▼▼ スマホ用：一覧を開閉 ▼▼ */}
+      {isMobile && (
+        <div style={{ padding: "12px" }}>
           <button
-            onClick={addDrama}
+            onClick={() => setShowMobileMenu(!showMobileMenu)}
             style={{
-              padding: "10px",
-              background: "#0070f3",
-              color: "#fff",
-              borderRadius: "6px",
-              fontSize: isMobile ? "14px" : "16px",
-              border: "none",
-              cursor: "pointer",
+              width: "100%",
+              padding: "12px",
+              borderRadius: "8px",
+              border: "1px solid #aaa",
+              background: "#eee",
+              fontSize: "16px",
             }}
           >
-            追加（12回自動生成）
+            {showMobileMenu ? "ドラマ一覧を閉じる" : "ドラマ一覧を開く"}
           </button>
-        </div>
 
-        {/* ドラマ一覧 */}
-        {sortedDramas.map((d) => {
-          const watchedCount = d.episodes.filter((e) => e.watched).length;
-          return (
-            <div
-              key={d.id}
-              onClick={() => setSelectedDramaId(d.id)}
-              style={dramaItemStyle(d.id === selectedDramaId)}
-            >
-              <div
-                style={{
-                  fontWeight: 600,
-                  fontSize: isMobile ? "16px" : "18px",
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                }}
-                title={d.title}
-              >
-                {d.title}
-              </div>
-              <div
-                style={{
-                  fontSize: isMobile ? "12px" : "14px",
-                  color: "#444",
-                }}
-              >
-                {d.weekday}曜 {d.time}
-              </div>
+          {/* 折りたたみメニュー */}
+          {showMobileMenu && (
+            <div style={{ marginTop: "12px" }}>
+              <div style={leftMenuStyle}>
+                <h2>ドラマ一覧</h2>
 
-              {/* バッジ */}
-              <div
-                style={{
-                  marginTop: "4px",
-                  display: "inline-block",
-                  padding: "2px 6px",
-                  fontSize: isMobile ? "10px" : "12px",
-                  background: "#0070f3",
-                  color: "#fff",
-                  borderRadius: "4px",
-                  userSelect: "none",
-                }}
-              >
-                {watchedCount} / 12 回
-              </div>
+                {/* 追加フォーム */}
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <input
+                    value={titleInput}
+                    onChange={(e) => setTitleInput(e.target.value)}
+                    placeholder="ドラマ名"
+                    style={{ padding: "10px", borderRadius: "6px", border: "1px solid #ccc" }}
+                  />
+                  <select
+                    value={weekdayInput}
+                    onChange={(e) => setWeekdayInput(e.target.value)}
+                    style={{ padding: "10px", borderRadius: "6px", border: "1px solid #ccc" }}
+                  >
+                    {weekdayOrder.map((w) => (
+                      <option key={w}>{w}</option>
+                    ))}
+                  </select>
+                  <input
+                    type="time"
+                    value={timeInput}
+                    onChange={(e) => setTimeInput(e.target.value)}
+                    style={{ padding: "10px", borderRadius: "6px", border: "1px solid #ccc" }}
+                  />
+                  <button
+                    onClick={addDrama}
+                    style={{
+                      padding: "10px",
+                      background: "#0070f3",
+                      color: "#fff",
+                      borderRadius: "6px",
+                      border: "none",
+                    }}
+                  >
+                    追加（12回生成）
+                  </button>
+                </div>
 
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  deleteDrama(d.id);
-                }}
-                style={{
-                  marginTop: "6px",
-                  padding: "6px",
-                  width: "100%",
-                  background: "#e53935",
-                  color: "#fff",
-                  borderRadius: "6px",
-                  fontSize: isMobile ? "12px" : "14px",
-                  border: "none",
-                  cursor: "pointer",
-                }}
-              >
-                12回まとめて削除
-              </button>
+                {/* 一覧 */}
+                {sortedDramas.map((d) => {
+                  const watchedCount = d.episodes.filter((e) => e.watched).length;
+                  return (
+                    <div
+                      key={d.id}
+                      onClick={() => {
+                        setSelectedDramaId(d.id);
+                        setShowMobileMenu(false);
+                      }}
+                      style={dramaItemStyle(d.id === selectedDramaId)}
+                    >
+                      <div style={{ fontWeight: 600 }}>{d.title}</div>
+                      <div>{d.weekday}曜 {d.time}</div>
+                      <div
+                        style={{
+                          marginTop: "4px",
+                          display: "inline-block",
+                          padding: "2px 6px",
+                          background: "#0070f3",
+                          color: "#fff",
+                          borderRadius: "4px",
+                          fontSize: "12px",
+                        }}
+                      >
+                        {watchedCount} / 12
+                      </div>
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteDrama(d.id);
+                        }}
+                        style={{
+                          marginTop: "6px",
+                          width: "100%",
+                          padding: "6px",
+                          background: "#e53935",
+                          color: "#fff",
+                          borderRadius: "6px",
+                          border: "none",
+                        }}
+                      >
+                        削除
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          );
-        })}
-      </div>
+          )}
+        </div>
+      )}
 
-      {/* 右側：エピソード一覧 */}
-      <div
-        style={{
-          ...rightPanelStyle,
-          width: isMobile ? "100%" : "auto",
-          fontSize: isMobile ? "14px" : "16px",
-        }}
-      >
-        {selectedDrama ? (
-          <>
-            <h2
+      {/* ▼▼ PC用メニュー（スマホでは非表示） ▼▼ */}
+      {!isMobile && (
+        <div style={leftMenuStyle}>
+          <h2>ドラマ一覧</h2>
+
+          {/* 追加フォーム */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            <input
+              value={titleInput}
+              onChange={(e) => setTitleInput(e.target.value)}
+              placeholder="ドラマ名"
+              style={{ padding: "10px", borderRadius: "6px", border: "1px solid #ccc" }}
+            />
+            <select
+              value={weekdayInput}
+              onChange={(e) => setWeekdayInput(e.target.value)}
+              style={{ padding: "10px", borderRadius: "6px", border: "1px solid #ccc" }}
+            >
+              {weekdayOrder.map((w) => (
+                <option key={w}>{w}</option>
+              ))}
+            </select>
+            <input
+              type="time"
+              value={timeInput}
+              onChange={(e) => setTimeInput(e.target.value)}
+              style={{ padding: "10px", borderRadius: "6px", border: "1px solid #ccc" }}
+            />
+            <button
+              onClick={addDrama}
               style={{
-                marginBottom: "12px",
-                fontSize: isMobile ? "18px" : "24px",
-                wordBreak: "keep-all",
+                padding: "10px",
+                background: "#0070f3",
+                color: "#fff",
+                borderRadius: "6px",
+                border: "none",
               }}
             >
+              追加（12回生成）
+            </button>
+          </div>
+
+          {sortedDramas.map((d) => {
+            const watchedCount = d.episodes.filter((e) => e.watched).length;
+            return (
+              <div
+                key={d.id}
+                onClick={() => setSelectedDramaId(d.id)}
+                style={dramaItemStyle(d.id === selectedDramaId)}
+              >
+                <div style={{ fontWeight: 600 }}>{d.title}</div>
+                <div>{d.weekday}曜 {d.time}</div>
+                <div
+                  style={{
+                    marginTop: "4px",
+                    padding: "2px 6px",
+                    background: "#0070f3",
+                    color: "#fff",
+                    borderRadius: "4px",
+                    fontSize: "12px",
+                    display: "inline-block",
+                  }}
+                >
+                  {watchedCount} / 12
+                </div>
+
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    deleteDrama(d.id);
+                  }}
+                  style={{
+                    marginTop: "6px",
+                    width: "100%",
+                    padding: "6px",
+                    background: "#e53935",
+                    color: "#fff",
+                    borderRadius: "6px",
+                    border: "none",
+                  }}
+                >
+                  削除
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ▼▼ エピソード一覧（共通） ▼▼ */}
+      <div style={{ flex: 1, padding: "16px", overflowY: "auto" }}>
+        {selectedDrama ? (
+          <>
+            <h2>
               {selectedDrama.title}（{selectedDrama.weekday}曜 {selectedDrama.time}）
             </h2>
 
@@ -371,30 +430,18 @@ export default function Page() {
 
             {selectedDrama.episodes.map((ep) => (
               <div key={ep.id} style={episodeCardStyle(ep.watched)}>
-                <div
-                  style={{
-                    fontSize: isMobile ? "16px" : "18px",
-                    fontWeight: 600,
-                    whiteSpace: "nowrap",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                  }}
-                  title={`第${ep.episodeNumber}回（${ep.date}）`}
-                >
+                <div style={{ fontWeight: 600 }}>
                   第{ep.episodeNumber}回（{ep.date}）
                 </div>
-
                 <button
                   onClick={() => toggleWatched(ep.id)}
                   style={{
                     marginTop: "10px",
                     width: "100%",
                     padding: "10px",
+                    background: ep.watched ? "#81c784" : "#eee",
                     borderRadius: "6px",
-                    background: ep.watched ? "#81c784" : "#eeeeee",
-                    fontSize: isMobile ? "14px" : "16px",
                     border: "none",
-                    cursor: "pointer",
                   }}
                 >
                   {ep.watched ? "未視聴にする" : "視聴済みにする"}
@@ -403,9 +450,7 @@ export default function Page() {
             ))}
           </>
         ) : (
-          <div style={{ color: "#666", fontSize: isMobile ? "14px" : "16px" }}>
-            左からドラマを選択してください
-          </div>
+          <div style={{ color: "#666" }}>ドラマを選択してね</div>
         )}
       </div>
     </div>
