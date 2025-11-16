@@ -36,7 +36,6 @@ export default function Page() {
 
     const newDramaId = crypto.randomUUID();
 
-    // 今日を基準に第1回の日付を作る
     const now = new Date();
     const currentWeekday = now.getDay();
     const targetWeekday = weekdayOrder.indexOf(weekdayInput);
@@ -45,10 +44,9 @@ export default function Page() {
     const firstDate = new Date(
       now.getFullYear(),
       now.getMonth(),
-      now.getDate() + diff + (diff < 0 ? 7 : 0) // 今週に放送日が過ぎてたら翌週
+      now.getDate() + diff + (diff < 0 ? 7 : 0)
     );
 
-    // 12週分のデータを生成（第1回 → 第12回）
     const episodes: Episode[] = Array.from({ length: 12 }).map((_, i) => {
       const date = new Date(firstDate);
       date.setDate(firstDate.getDate() + 7 * i);
@@ -56,7 +54,7 @@ export default function Page() {
 
       return {
         id: crypto.randomUUID(),
-        episodeNumber: i + 1, // 第n回（1始まり）
+        episodeNumber: i + 1,
         date: dateStr,
         watched: false,
       };
@@ -74,13 +72,11 @@ export default function Page() {
     setTitleInput("");
   };
 
-  // 選択しているドラマ
   const selectedDrama = useMemo(
     () => dramas.find((d) => d.id === selectedDramaId) || null,
     [selectedDramaId, dramas]
   );
 
-  // 視聴済み切り替え
   const toggleWatched = (episodeId: string) => {
     if (!selectedDrama) return;
 
@@ -98,7 +94,6 @@ export default function Page() {
     );
   };
 
-  // 一括で第 N 回まで視聴済みにする
   const setWatchedUntil = (n: number) => {
     if (!selectedDrama) return;
 
@@ -117,40 +112,100 @@ export default function Page() {
     );
   };
 
-  // 12回分まとめて削除
   const deleteDrama = (id: string) => {
     setDramas((prev) => prev.filter((d) => d.id !== id));
     if (selectedDramaId === id) setSelectedDramaId(null);
   };
 
-  // 曜日順ソート
   const sortedDramas = useMemo(() => {
-    return dramas.sort(
+    // 注意: sortは破壊的なのでコピーしてからsort
+    return [...dramas].sort(
       (a, b) =>
         weekdayOrder.indexOf(a.weekday) - weekdayOrder.indexOf(b.weekday)
     );
   }, [dramas]);
 
+  // --- レスポンシブ用スタイル ---
+  // 画面幅600px以下で文字サイズを小さく、右側の幅調整
+  const containerStyle: React.CSSProperties = {
+    display: "flex",
+    flexDirection: "row",
+    height: "100vh",
+    overflow: "hidden",
+    fontFamily: "sans-serif",
+    backgroundColor: "#fff",
+    color: "#222",
+  };
+
+  const leftMenuStyle: React.CSSProperties = {
+    width: "240px",
+    borderRight: "1px solid #ccc",
+    padding: "12px",
+    overflowY: "auto",
+  };
+
+  const dramaItemStyle = (isSelected: boolean): React.CSSProperties => ({
+    padding: "10px",
+    marginBottom: "8px",
+    borderRadius: "8px",
+    background: isSelected ? "#bbdefb" : "#f0f0f0",
+    cursor: "pointer",
+    border: "1px solid #ddd",
+    userSelect: "none",
+  });
+
+  const rightPanelStyle: React.CSSProperties = {
+    flex: 1,
+    padding: "16px",
+    overflowY: "auto",
+  };
+
+  const episodeCardStyle = (watched: boolean): React.CSSProperties => ({
+    padding: "14px",
+    marginBottom: "10px",
+    borderRadius: "8px",
+    border: "1px solid #ccc",
+    background: watched ? "#dcedc8" : "#fff",
+  });
+
+  // メディアクエリ的にスタイル変更するために簡単にJSで判定
+  const [isMobile, setIsMobile] = React.useState(false);
+
+  React.useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 600);
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
   return (
     <div
       style={{
-        display: "flex",
-        flexDirection: "row",
-        height: "100vh",
-        overflow: "hidden",
-        fontFamily: "sans-serif",
+        ...containerStyle,
+        flexDirection: isMobile ? "column" : "row",
       }}
     >
-      {/* 左メニュー（ドラマ一覧） */}
+      {/* 左メニュー */}
       <div
         style={{
-          width: "240px",
-          borderRight: "1px solid #ccc",
-          padding: "12px",
+          ...leftMenuStyle,
+          width: isMobile ? "100%" : "240px",
+          borderRight: isMobile ? "none" : "1px solid #ccc",
+          borderBottom: isMobile ? "1px solid #ccc" : "none",
+          maxHeight: isMobile ? "auto" : "100vh",
           overflowY: "auto",
         }}
       >
-        <h2 style={{ marginBottom: "12px" }}>ドラマ一覧</h2>
+        <h2
+          style={{
+            marginBottom: "12px",
+            fontSize: isMobile ? "20px" : "24px",
+          }}
+        >
+          ドラマ一覧
+        </h2>
 
         {/* 追加フォーム */}
         <div
@@ -169,7 +224,7 @@ export default function Page() {
               padding: "10px",
               borderRadius: "6px",
               border: "1px solid #ccc",
-              fontSize: "16px",
+              fontSize: isMobile ? "14px" : "16px",
             }}
           />
           <select
@@ -179,7 +234,7 @@ export default function Page() {
               padding: "10px",
               borderRadius: "6px",
               border: "1px solid #ccc",
-              fontSize: "16px",
+              fontSize: isMobile ? "14px" : "16px",
             }}
           >
             {weekdayOrder.map((w) => (
@@ -194,7 +249,7 @@ export default function Page() {
               padding: "10px",
               borderRadius: "6px",
               border: "1px solid #ccc",
-              fontSize: "16px",
+              fontSize: isMobile ? "14px" : "16px",
             }}
           />
           <button
@@ -204,6 +259,9 @@ export default function Page() {
               background: "#0070f3",
               color: "#fff",
               borderRadius: "6px",
+              fontSize: isMobile ? "14px" : "16px",
+              border: "none",
+              cursor: "pointer",
             }}
           >
             追加（12回自動生成）
@@ -217,30 +275,40 @@ export default function Page() {
             <div
               key={d.id}
               onClick={() => setSelectedDramaId(d.id)}
-              style={{
-                padding: "10px",
-                marginBottom: "8px",
-                borderRadius: "8px",
-                background: d.id === selectedDramaId ? "#e3f2fd" : "#f8f8f8",
-                cursor: "pointer",
-                border: "1px solid #ddd",
-              }}
+              style={dramaItemStyle(d.id === selectedDramaId)}
             >
-              <div style={{ fontWeight: 600 }}>{d.title}</div>
-              <div style={{ fontSize: "14px", color: "#666" }}>
+              <div
+                style={{
+                  fontWeight: 600,
+                  fontSize: isMobile ? "16px" : "18px",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+                title={d.title}
+              >
+                {d.title}
+              </div>
+              <div
+                style={{
+                  fontSize: isMobile ? "12px" : "14px",
+                  color: "#444",
+                }}
+              >
                 {d.weekday}曜 {d.time}
               </div>
 
-              {/* バッジ：視聴済みカウント */}
+              {/* バッジ */}
               <div
                 style={{
                   marginTop: "4px",
                   display: "inline-block",
                   padding: "2px 6px",
-                  fontSize: "12px",
+                  fontSize: isMobile ? "10px" : "12px",
                   background: "#0070f3",
                   color: "#fff",
                   borderRadius: "4px",
+                  userSelect: "none",
                 }}
               >
                 {watchedCount} / 12 回
@@ -258,7 +326,9 @@ export default function Page() {
                   background: "#e53935",
                   color: "#fff",
                   borderRadius: "6px",
-                  fontSize: "14px",
+                  fontSize: isMobile ? "12px" : "14px",
+                  border: "none",
+                  cursor: "pointer",
                 }}
               >
                 12回まとめて削除
@@ -271,18 +341,23 @@ export default function Page() {
       {/* 右側：エピソード一覧 */}
       <div
         style={{
-          flex: 1,
-          padding: "16px",
-          overflowY: "auto",
+          ...rightPanelStyle,
+          width: isMobile ? "100%" : "auto",
+          fontSize: isMobile ? "14px" : "16px",
         }}
       >
         {selectedDrama ? (
           <>
-            <h2 style={{ marginBottom: "12px" }}>
+            <h2
+              style={{
+                marginBottom: "12px",
+                fontSize: isMobile ? "18px" : "24px",
+                wordBreak: "keep-all",
+              }}
+            >
               {selectedDrama.title}（{selectedDrama.weekday}曜 {selectedDrama.time}）
             </h2>
 
-            {/* 一括視聴済み */}
             <div style={{ marginBottom: "20px" }}>
               <div>第何回まで視聴済みにする？</div>
               <input
@@ -294,19 +369,18 @@ export default function Page() {
               />
             </div>
 
-            {/* 各エピソード */}
             {selectedDrama.episodes.map((ep) => (
-              <div
-                key={ep.id}
-                style={{
-                  padding: "14px",
-                  marginBottom: "10px",
-                  borderRadius: "8px",
-                  border: "1px solid #ccc",
-                  background: ep.watched ? "#e8f5e9" : "#fff",
-                }}
-              >
-                <div style={{ fontSize: "18px", fontWeight: 600 }}>
+              <div key={ep.id} style={episodeCardStyle(ep.watched)}>
+                <div
+                  style={{
+                    fontSize: isMobile ? "16px" : "18px",
+                    fontWeight: 600,
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                  title={`第${ep.episodeNumber}回（${ep.date}）`}
+                >
                   第{ep.episodeNumber}回（{ep.date}）
                 </div>
 
@@ -317,17 +391,21 @@ export default function Page() {
                     width: "100%",
                     padding: "10px",
                     borderRadius: "6px",
-                    background: ep.watched ? "#9ccc65" : "#eeeeee",
-                    fontSize: "16px",
+                    background: ep.watched ? "#81c784" : "#eeeeee",
+                    fontSize: isMobile ? "14px" : "16px",
+                    border: "none",
+                    cursor: "pointer",
                   }}
                 >
-                  {ep.watched ? "未視聴" : "視聴済みにする"}
+                  {ep.watched ? "未視聴にする" : "視聴済みにする"}
                 </button>
               </div>
             ))}
           </>
         ) : (
-          <div style={{ color: "#666" }}>左からドラマを選択してください</div>
+          <div style={{ color: "#666", fontSize: isMobile ? "14px" : "16px" }}>
+            左からドラマを選択してください
+          </div>
         )}
       </div>
     </div>
